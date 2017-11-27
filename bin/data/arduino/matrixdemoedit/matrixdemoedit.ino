@@ -1,33 +1,12 @@
 #include "Adafruit_HT1632.h"
 
-//orange 17
-
 #define HT_DATA 2
-
-//yellow 5
-
 #define HT_WR   3 
-#define HT_CS0   4
-#define HT_CS1  5
-#define HT_CS2  6
-#define HT_CS3  7
-#define HT_CS4  8
-// use this line for single matrix
-//Adafruit_HT1632LEDMatrix matrix = Adafruit_HT1632LEDMatrix(HT_DATA, HT_WR, HT_CS);
-// use this line for two matrices!
 
-  Vector<int8_t> pins = Vector<int8_t>();
-  
 
+Vector<int8_t> pins = Vector<int8_t>();
   
 Adafruit_HT1632LEDMatrix* matrix;
-
-
-
-//pins.push_back(9);
-
-
-
 
 
 void setup() 
@@ -41,8 +20,6 @@ void setup()
     pins.push_back(10);
     pins.push_back(11);
 
-
-  //
     matrix = new Adafruit_HT1632LEDMatrix(HT_DATA, HT_WR, pins);
     Serial.setTimeout(10000);
     Serial.begin(115200);
@@ -71,25 +48,8 @@ void loop()
     {
       isFrameNew = true;
     }
-    incomingString.concat("NEW");
 
-  }/*
-  else
-  {
-    matrix->print("NO SERIAL DATA");  
-    matrix->writeScreen();
-    //demoLoop();
-  }*/
-/*
-  if(isFrameNew)
-  {
-    matrix->clearScreen();
-    matrix->setCursor(0, 0);
-    matrix->print(incomingString);
-    matrix->writeScreen();
   }
-  incomingString = "";
-  */
 
 if(isFrameNew)
   {
@@ -114,6 +74,15 @@ if(isFrameNew)
     
         }
       }
+      matrix->writeScreen();
+      delay(1000);
+
+      size_t numWritten = Serial.write("NEW");
+      incomingString.concat(":");
+      incomingString.concat(String(numWritten));
+      matrix->setCursor(24, 0);
+
+      matrix->print(incomingString);
       matrix->writeScreen();
 
   }
@@ -174,4 +143,3 @@ void demoLoop()
       
     }  
 }
-

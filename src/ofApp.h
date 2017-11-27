@@ -143,23 +143,70 @@ public:
         {
             ofSleepMillis(2000);
 
-            for(size_t i=0; i<panels.size(); i++)
+            for(size_t i=0; i<1; i++)
             {
                 Panel panel = panels[i];
                 int written = serial.writeBytes(panel.bytes, panel.numPixels);
                 if(written == panel.numPixels)
                 {
                     didSend = true;
+                    ofLog() << "didSend: " << didSend;
+                    serial.flush();    
+    
                 }
                 
             }
             
+            if(didSend)
+            {
+                int bytes_required = 3;  
+                unsigned char bytes[bytes_required];  
+                int bytes_remaining = bytes_required;  
+                while ( bytes_remaining > 0 )  
+                {  
+                    int avail = serial.available();
+                    //ofSleepMillis(3000);
+                    while(serial.available() > 0)
+                    {
+                        // check for data  
+                        // try to read - note offset into the bytes[] array, this is so that we   
+                        // don't overwrite the bytes we already have  
+                        int result = serial.readBytes( &bytes[bytes_required-bytes_remaining], bytes_remaining ); 
+                        
+                        ofLog() << "avail :" << avail << " result: " << result;
+
+                        // check for error code  
+                        if ( result == OF_SERIAL_ERROR )  
+                        {  
+                            ofLog() << "unrecoverable error reading serial" ;  
+                            break;  
+                        }  
+                        else if ( result == OF_SERIAL_NO_DATA )  
+                        {  
+                            //ofLog() << "OF_SERIAL_NO_DATA" ;  
+                            
+                        }  
+                        else  
+                        {  
+                            // we read some data!  
+                            // maybe not all..  
+                            bytes_remaining -= result;  
+                            ofLog() << "bytes_remaining: " << bytes_remaining <<  " result: " << result; 
+                        } 
+                        
+                    }
+                    
+                    
+                    
+                    //ofSleepMillis(1000);
+                    
+                }  
+                
+            }
             
             
         }
-        //ofLog() << "didSend: " << didSend;
-
-        
     }
+
 };
 
