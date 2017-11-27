@@ -9,20 +9,22 @@ public:
     int height;
     ofPixels pixels;
     ofImage image;
-    unsigned char* bytes;
+    vector<unsigned char> bytes;
     int numPixels;
-    int circleSize = 5;
+    float circleSize = 3;
     float pitch = circleSize*2;
     
     int drawWidth;
     int drawHeight;
+    bool doRandom = true;
+
     Panel()
     {
         width = 24;
         height = 16;
         numPixels = width*height;
-        
-        bytes  = new unsigned char[numPixels];
+        doRandom = false;
+        bytes.resize(numPixels);
         
         drawWidth =  width*pitch;
         drawHeight = height*pitch;
@@ -34,40 +36,73 @@ public:
         image.resize(width, height);
         image.update();
         pixels = image.getPixels();
-        
+        ofColor foregroundColor;
+        int counter = 0;
+
+        for(int x=0; x<width; x++)
+        {
+            for(int y=0; y<height; y++)
+            {
+                if(doRandom)
+                {
+                    int rNum = (int)ofRandom(0, 56);
+                    if(rNum%2 == 0)
+                    {
+                        bytes[counter] = '0';
+                        
+                    }
+                    else
+                    {
+                        bytes[counter] = '1'; 
+                        
+                    } 
+                    
+                }else
+                {
+                    ofColor color = pixels.getColor(x, y);
+                    if(color == ofColor::white)
+                    {
+                        bytes[counter] = '0';
+  
+                    }else
+                    {
+                        bytes[counter] = '1'; 
+                        
+                    }  
+                    
+                }
+                drawWidth = x*pitch;
+                drawHeight = y*pitch;
+                counter++;
+            }
+        }
     }
     void draw()
     {
         ofPushMatrix();
         ofPushStyle();
         int counter = 0;
-        ofColor foregroundColor;
-        
+        ofColor color;
         for(int x=0; x<width; x++)
         {
             for(int y=0; y<height; y++)
             {
-                
-                ofColor color = pixels.getColor(x, y);
-                if(color == ofColor::white)
+    
+                if(bytes[counter] == '0')
                 {
-                    bytes[counter] = '0';
-                    foregroundColor = ofColor::white;
-                    
+                    color = ofColor::white;
+
                     
                 }else
                 {
-                    bytes[counter] = '1'; 
-                    foregroundColor = ofColor::black; 
-                    
-                } 
-                
+                    color = ofColor::black; 
+
+                }
                 
                 ofSetRectMode(OF_RECTMODE_CORNER); //set rectangle mode to the corner
-                ofSetColor(foregroundColor);
+                ofSetColor(color);
                 ofDrawCircle(x*pitch, y*pitch, circleSize);
-                drawWidth = x*pitch;
-                drawHeight = y*pitch;
+
                 //ofDrawBitmapStringHighlight(info.str(), x*30, y*30, ofColor::black, foregroundColor);
                 
                 counter++;
@@ -105,15 +140,16 @@ public:
         int baud = 115200;
         serial.setup("/dev/ttyACM0", baud); //open the first device
         
-        
-        Panel panel;
-        panel.setup("of.png");
-        
-        Panel panel2;
-        panel2.setup("of.png");
-        
-        panels.push_back(panel);
-        panels.push_back(panel2);
+        for(size_t i=0; i<8; i++)
+        {
+            Panel panel;
+            if(i%2 ==0)
+            {
+                panel.doRandom = true; 
+            }
+            panel.setup("of.png");
+            panels.push_back(panel);
+        }
 
     }
     
@@ -142,23 +178,34 @@ public:
         if(!didSend)
         {
             ofSleepMillis(2000);
-
-            for(size_t i=0; i<1; i++)
+            vector<unsigned char>payload;
+            
+            for(size_t i=0; i<2; i++)
             {
                 Panel panel = panels[i];
-                int written = serial.writeBytes(panel.bytes, panel.numPixels);
-                if(written == panel.numPixels)
+                
+                for(size_t n=0; n<panel.bytes.size(); n++)
                 {
-                    didSend = true;
-                    ofLog() << "didSend: " << didSend;
-                    serial.flush();    
-    
+                    payload.push_back(panel.bytes[n]);
                 }
+                
+                
                 
             }
             
+            int written = serial.writeBytes(&payload[0], payload.size());
+            if(written == payload.size())
+            {
+                didSend = true;
+                ofLog() << "didSend: " << didSend;
+                //serial.flush();    
+                
+            }
+            
+#if 0
             if(didSend)
             {
+                
                 int bytes_required = 3;  
                 unsigned char bytes[bytes_required];  
                 int bytes_remaining = bytes_required;  
@@ -203,7 +250,7 @@ public:
                 }  
                 
             }
-            
+#endif
             
         }
     }
