@@ -31,7 +31,7 @@ class Panel
 
 Panel* panels;
 int8_t* pins;
-#define numPanels 3
+#define numPanels 8
 
 
 
@@ -43,7 +43,7 @@ char buffer[bufferSize];
 
 #define numValues (384*numPanels)
 
-uint8_t values[numValues];
+//uint8_t values[numValues];
 
 
 
@@ -68,7 +68,7 @@ void setup()
 
     
         
-
+    #if 0
     int valueCounter  = 0;
     bool isSet = false;
     for(int i=0; i<bufferSize; i++)
@@ -79,6 +79,7 @@ void setup()
         valueCounter++;
       }
     }
+    #endif
     //hasData = true;
 
     
@@ -115,6 +116,7 @@ void loop()
   
       if(inByte == bufferSize)
       {
+          #if 0
           int bitCounter = 0;
           for(size_t i=0; i<bufferSize; i++)
           {
@@ -127,44 +129,62 @@ void loop()
 
             }
           }
-
+          #endif
         isFrameNew = true;
         hasData = true;
       }
     }
  }
   if(isFrameNew)
-    {
-      matrix->clearScreen();
-      matrix->setCursor(0, 0);
+  {
+    matrix->clearScreen();
+    matrix->setCursor(0, 0);
      
-     size_t counter = 0;
-  
-      for (size_t i=0; i< numPanels; i++) 
-      {
-  
-          Panel* panel = &panels[i];
-          
-          for (uint8_t x=panel->startX; x<panel->endX; x++) 
+    size_t counter = 0;
+
+    int bitCounter = 0;
+    int charCounter = 0;
+    for (size_t i=0; i< numPanels; i++) 
+    {
+    
+        Panel* panel = &panels[i];
+        
+        for (uint8_t x=panel->startX; x<panel->endX; x++) 
+        {
+          for (uint8_t y=0; y< 16; y++) 
           {
-            for (uint8_t y=0; y< 16; y++) 
+            
+            char currentChar = buffer[charCounter];
+            int currentBit = (currentChar >> bitCounter) & 1U;
+            int isBitOn = (currentBit == 0);
+            if(isBitOn)
             {
-              if(values[counter]== 0)
+              matrix->clrPixel(x, y);
+            }else
+            {
+              matrix->setPixel(x, y);
+            }
+            if(bitCounter+1 < 8)
+            {
+              bitCounter++;  
+            }else
+            {
+              bitCounter = 0;
+              if(charCounter+ 1 < bufferSize)
               {
-                matrix->clrPixel(x, y);
+                  charCounter++;
               }else
               {
-                matrix->setPixel(x, y);
+                charCounter = 0;  
               }
-              counter++;
-              
-            }
+            } 
           }
-          
-      }
-      matrix->writeScreen();
-
+        }
+        
     }
+    matrix->writeScreen();
+
+   }
 }
 
 #if 0
