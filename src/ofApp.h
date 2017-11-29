@@ -7,14 +7,11 @@ class Panel
 public:
     int width;
     int height;
-    ofPixels pixels;
-    ofImage image;
+    
     vector<unsigned char>payload;
     
-    int numPixels;
     float circleSize = 3;
     float pitch = circleSize*2;
-    bitset<384> bits;
     int drawWidth;
     int drawHeight;
     bool doRandom;
@@ -24,29 +21,19 @@ public:
     {
         width = 24;
         height = 16;
-        numPixels = width*height;
         doRandom = false;
         doRows = false;
-        //bits.resize(numPixels);
         
         drawWidth =  width*pitch;
         drawHeight = height*pitch;
         payload.resize(48);
         
-        
     }
     
-    void setValue(int currentCharIndex, int index, int value )
-    {
-        
-    }
     
-    void setup(string imagePath)
+    
+    void processPixels(ofPixels& pixels)
     {
-        image.load(imagePath);
-        image.resize(width, height);
-        image.update();
-        pixels = image.getPixels();
         ofColor foregroundColor;
         int pixelCounter = 0;
         int currentCharIndex = 0;
@@ -55,7 +42,6 @@ public:
         {
             for(int y=0; y<height; y++)
             {
-                //ofLog() << " pixelCounter : " << pixelCounter << " currentCharIndex: " << currentCharIndex << " bitIndex: " << bitIndex;
                 unsigned char* currentChar = &payload[currentCharIndex];
                 unsigned long newbit;
                 bool isOn = false;
@@ -98,10 +84,8 @@ public:
                     newbit = !!0;
                 }
                 *currentChar ^= (-newbit ^ *currentChar) & (1UL << bitIndex);
-                //leds.push_back(isOn);
                 
-                drawWidth = x*pitch;
-                drawHeight = y*pitch;
+                
                 pixelCounter++;
                 if(pixelCounter % 8 == 0)
                 {
@@ -129,7 +113,7 @@ public:
             for (size_t n = 0; n < 8; n++) 
             {
                 int bit = (payload[i] >> n) & 1U;
-                bool isBitOn = (bit == 0);
+                bool isBitOn = (bit == 1);
                 leds.push_back(isBitOn);
                 
             }
@@ -139,7 +123,7 @@ public:
             for(int y=0; y<height; y++)
             {
                 
-                if(leds[counter] == 0)
+                if(leds[counter])
                 {
                     color = ofColor::white;
                     
@@ -153,9 +137,6 @@ public:
                 ofSetRectMode(OF_RECTMODE_CORNER); //set rectangle mode to the corner
                 ofSetColor(color);
                 ofDrawCircle(x*pitch, y*pitch, circleSize);
-                
-                //ofDrawBitmapStringHighlight(info.str(), x*30, y*30, ofColor::black, foregroundColor);
-                
                 counter++;
             }
         }
@@ -173,15 +154,24 @@ public:
     
     
     ofSerial    serial;
-    string outputString;
-    bool didSend = false;
     
     vector<Panel> panels;
+    bool isFrameNew = false;
+    ofFbo fbo;
+    ofFbo videoPanelFBO;
+    
+    ofPixels pixels;
+    ofImage image;
+    ofVideoPlayer videoPlayer;
+    ofTrueTypeFont        font;
+    
     void setup()
     {
         //ofSetVerticalSync(false);
+        font.load("DIN.otf", 90);
         
         ofSetLogLevel(OF_LOG_VERBOSE);
+        ofSetLogLevel("ofSerial", OF_LOG_WARNING);
         //ofSetFrameRate(2);
         
         serial.listDevices();
@@ -189,49 +179,141 @@ public:
         
         int baud = 115200;
         serial.setup("/dev/cu.usbmodem3A21", baud); //open the first device
+        image.load("of.png");
+        //image.resize(24, 16);
+        //image.update();
         
+        fbo.allocate(24, 16, GL_RGB);
+        fbo.begin();
+        ofClear(0, 0, 0, 0);
+        fbo.end();
+        pixels.allocate(24, 16, OF_PIXELS_RGB);
+        
+        videoPanelFBO.allocate(80, 120, GL_RGB);
+        videoPanelFBO.begin();
+        ofClear(0, 0, 0, 0);
+        videoPanelFBO.end();
+        
+        //pixels = image.getPixels();
+        fbo.readToPixels(pixels);
         for(size_t i=0; i<8; i++)
         {
             Panel panel;
-            if(i%2 ==0)
-            {
-                //panel.doRows = true; 
-            }
+            panel.processPixels(pixels);  
+            
             //panel.doRows = true;
-            panel.setup("of.png");
+            
             panels.push_back(panel);
         }
+        videoPlayer.load("fingers.mov");
+        videoPlayer.setLoopState(OF_LOOP_NORMAL);
+        videoPlayer.play();
         
+    }
+    void fboDrawRects(int i)
+    {
+        ofSetColor(ofColor::white);
+        
+        ofDrawRectangle(0, 0, fbo.getWidth(), fbo.getHeight());
+        ofSetColor(ofColor::black);
+        for(size_t n=0; n<i+1; n++)
+        {
+            ofDrawRectangle(n, 0, 1, 1); 
+        }
+    }
+    void fboDrawImage()
+    {
+        image.draw(0, 0, fbo.getWidth(), fbo.getHeight());
+        ofSetColor(ofColor::black);
+        for(size_t n=0; n<30; n++)
+        {
+            ofDrawRectangle(ofRandom(fbo.getWidth()), ofRandom(fbo.getHeight()), 1, 1); 
+        }
     }
     
     void update()
     {
         
+        videoPlayer.update();
+        
+        
+        ofSetWindowTitle(ofToString(ofGetFrameRate()));
+        
+        
+        
     }
+    
     
     void draw()
     {
-        int spacing = 60;
-        ofPushMatrix();
-        ofTranslate(60, 60);
+        
+        int videoPanelWidth = videoPlayer.getWidth()/4;
+        int videoPanelHeight = videoPlayer.getHeight()/2;
+        string messages = "01234567";
+        
+        
+        
         for(size_t i=0; i<panels.size(); i++)
         {
+            messages[i] = (char)ofToString(ofRandom(0, 9)).c_str()[0];
+            
+            //panels[i].doRows = !panels[i].doRows;
+            
+            videoPanelFBO.begin();
+            ofClear(ofColor::black);
+            /*
+             if(i<=4)
+             {
+             videoPlayer.getTexture().drawSubsection(0, 0, videoPanelWidth, videoPanelHeight, i*videoPanelWidth, 0);
+             }else
+             {
+             videoPlayer.getTexture().drawSubsection(0, 0, videoPanelWidth, videoPanelHeight, i*videoPanelWidth, videoPanelHeight);
+             }*/
+            
+            ofPushStyle();
+            
+            ofSetColor(ofColor::white);
+            font.drawString(ofToString(messages[i]), 0, videoPanelHeight);
+            ofPopStyle();
+            
+            videoPanelFBO.end();
+            
+            ofPushStyle();
+            fbo.begin();
+            ofClear(0, 0, 0, 0);
+            //fboDrawImage();
+            //fboDrawRects(i);
+            
+            
+            videoPanelFBO.draw(0, 0, fbo.getWidth(), fbo.getHeight());
+            
+            
+            fbo.end();
+            ofPopStyle();
+            fbo.readToPixels(pixels);
+            
+            panels[i].processPixels(pixels);
+            
             ofPushMatrix();
             ofTranslate(panels[i].drawWidth*i, 0);
             panels[i].draw();
+            ofTranslate(0, panels[i].drawHeight);
+            fbo.draw(0, 0, panels[i].drawWidth, panels[i].drawHeight);
+            
             ofPopMatrix();
             
+            
         }
-        ofPopMatrix();
         
-        
-        //ofDrawBitmapStringHighlight(outputString, 100, 100);
-        if(!didSend)
+        if(ofGetFrameNum() % 50 == 0)
         {
-            ofSleepMillis(2000);
+            isFrameNew = true;
+        }
+        if(isFrameNew)
+        {
             vector<unsigned char>payload;
             
-            for(size_t i=0; i<3; i++)
+            for(size_t i=0; i<8; i++)
             {
                 Panel panel = panels[i];
                 
@@ -247,14 +329,47 @@ public:
             int written = serial.writeBytes(&payload[0], payload.size());
             if(written == payload.size())
             {
-                didSend = true;
-                ofLog() << "didSend: " << didSend;
-                
+                /*
+                 int readData = serial.readByte();
+                 ofLog() << "readData: " << readData;
+                 if(readData == 9)
+                 {
+                 ofLog() << "READY: " << ofGetFrameNum();
+                 
+                 
+                 }*/
             }
             
-            
-            
-        }
+            isFrameNew = false;
+        }  
+        
+        
+        ofTranslate(0, 300);
+        //videoPanelFBO.draw(0, 0);
+        videoPlayer.draw(0, 0);
+        
+        
+        /*
+         int videoPanelWidth = videoPlayer.getWidth()/4;
+         int videoPanelHeight = videoPlayer.getHeight()/2;
+         
+         ofTranslate(0, 100);
+         for(size_t i=0; i<panels.size(); i++)
+         {
+         videoPanelFBO.begin();
+         ofClear(0, 0, 0, 0);
+         if(i<=4)
+         {
+         videoPlayer.getTexture().drawSubsection(0, 0, videoPanelWidth, videoPanelHeight, i*videoPanelWidth, 0);
+         }else
+         {
+         videoPlayer.getTexture().drawSubsection(0, 0, videoPanelWidth, videoPanelHeight, i*videoPanelWidth, videoPanelHeight);
+         }
+         videoPanelFBO.end();
+         
+         videoPanelFBO.draw(i*24, 0, fbo.getWidth(), fbo.getHeight());
+         }*/
+        
     }
     
 };
